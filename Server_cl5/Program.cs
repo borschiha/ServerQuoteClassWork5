@@ -3,15 +3,16 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using System.Collections.Generic; // Required for List
+using System.Collections.Generic;
+using System.Threading.Tasks; // Требуется для async/await и Task
 
-namespace Server_cl5
+namespace Server_cl5_Async
 {
     internal class Program
     {
         private const int _port = 1234;
         private const string _serverIp = "10.2.206.67";
-        private const string _appname = "cl5Server";
+        private const string _appname = "cl5ServerAsync";
 
         private static readonly Random _random = new Random();
 
@@ -46,11 +47,11 @@ namespace Server_cl5
             "Coffee in one hand, phone in the other."
         };
 
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
+            Console.OutputEncoding = Encoding.UTF8;
+            Console.InputEncoding = Encoding.UTF8;
 
-            Console.OutputEncoding = System.Text.Encoding.UTF8;
-            Console.InputEncoding = System.Text.Encoding.UTF8;
             AddFirewallRule(_port, _appname);
 
             TcpListener listener = null;
@@ -58,24 +59,27 @@ namespace Server_cl5
             {
                 IPAddress ip = IPAddress.Parse(_serverIp);
                 IPEndPoint ep = new IPEndPoint(ip, _port);
+
                 listener = new TcpListener(ep);
 
                 listener.Start();
                 Console.WriteLine($"*** SERVER START WORKING on {_serverIp}:{_port} ***");
+                Console.WriteLine("Server is ready to accept multiple clients...");
 
                 while (true)
                 {
-                    Console.WriteLine("Waiting for a client connection...");
+                    TcpClient client = await listener.AcceptTcpClientAsync();
 
-                    TcpClient client = listener.AcceptTcpClient();
-
-                    HandleClient(client);
-
+                    Task.Run(() => HandleClientAsync(client));
                 }
+            }
+            catch (SocketException ex) when (ex.ErrorCode == 10004)
+            {
+                Console.WriteLine("Listener stopped gracefully.");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Server error: {ex.Message}");
+                Console.WriteLine($"Server fatal error: {ex.Message}");
             }
             finally
             {
@@ -83,8 +87,7 @@ namespace Server_cl5
                 Console.WriteLine("*** SERVER SHUT DOWN ***");
             }
         }
-
-        private static void HandleClient(TcpClient client)
+        private static async Task HandleClientAsync(TcpClient client)
         {
             using (client)
             {
@@ -92,7 +95,7 @@ namespace Server_cl5
                 int clientPort = ((IPEndPoint)client.Client.RemoteEndPoint).Port;
                 DateTime connectTime = DateTime.Now;
 
-                Console.WriteLine($"*** CLIENT IS CONNECTED ***");
+                Console.WriteLine($"*** CLIENT CONNECTED ***");
                 Console.WriteLine($"Client Info: {clientAddress}:{clientPort} | Connect Time: {connectTime}");
 
                 using (NetworkStream stream = client.GetStream())
@@ -102,7 +105,7 @@ namespace Server_cl5
                         byte[] buf = new byte[1024];
                         int bytesRead;
 
-                        while ((bytesRead = stream.Read(buf, 0, buf.Length)) > 0)
+                        while ((bytesRead = await stream.ReadAsync(buf, 0, buf.Length)) > 0)
                         {
                             string message = Encoding.UTF8.GetString(buf, 0, bytesRead).Trim().ToLower();
                             Console.WriteLine($"Received from {clientAddress}: '{message}'");
@@ -111,14 +114,14 @@ namespace Server_cl5
                             {
                                 string response = GetRandomQuote();
                                 byte[] bytes = Encoding.UTF8.GetBytes(response);
-                                stream.Write(bytes, 0, bytes.Length);
+                                await stream.WriteAsync(bytes, 0, bytes.Length);
                                 Console.WriteLine($"Sent quote to {clientAddress}.");
                             }
                             else
                             {
-                                string response = GetRandomQuote();
+                                string response = $"Server received your message: '{message}'. Send 'quote' for a quote.";
                                 byte[] bytes = Encoding.UTF8.GetBytes(response);
-                                stream.Write(bytes, 0, bytes.Length);
+                                await stream.WriteAsync(bytes, 0, bytes.Length);
                             }
                         }
                     }
@@ -132,6 +135,7 @@ namespace Server_cl5
                 Console.WriteLine($"*** CLIENT DISCONNECTED: {clientAddress} | Disconnect Time: {disconnectTime} ***");
             }
         }
+
         public static string GetRandomQuote()
         {
             int randomIndex = _random.Next(AllEnglishQuotes.Count);

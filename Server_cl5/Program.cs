@@ -99,7 +99,6 @@ namespace Server_cl5
                         byte[] buf = new byte[1024];
                         int bytesRead;
 
-                        // Loop to continuously read messages from this client
                         while ((bytesRead = stream.Read(buf, 0, buf.Length)) > 0)
                         {
                             string message = Encoding.UTF8.GetString(buf, 0, bytesRead).Trim().ToLower();
@@ -119,9 +118,6 @@ namespace Server_cl5
                                 stream.Write(bytes, 0, bytes.Length);
                             }
                         }
-                    }
-                    catch (System.IO.IOException)
-                    {
                     }
                     catch (Exception ex)
                     {

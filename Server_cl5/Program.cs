@@ -48,6 +48,9 @@ namespace Server_cl5
 
         static void Main(string[] args)
         {
+
+            Console.OutputEncoding = System.Text.Encoding.UTF8;
+            Console.InputEncoding = System.Text.Encoding.UTF8;
             AddFirewallRule(_port, _appname);
 
             TcpListener listener = null;
@@ -113,7 +116,7 @@ namespace Server_cl5
                             }
                             else
                             {
-                                string response = $"Server received your message: '{message}'";
+                                string response = GetRandomQuote();
                                 byte[] bytes = Encoding.UTF8.GetBytes(response);
                                 stream.Write(bytes, 0, bytes.Length);
                             }
